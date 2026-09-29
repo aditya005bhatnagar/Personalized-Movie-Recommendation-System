@@ -5,6 +5,7 @@ venv/
 env/
 
 data/*.csv
+saved_models/
 
 .ipynb_checkpoints/
 .vscode/
