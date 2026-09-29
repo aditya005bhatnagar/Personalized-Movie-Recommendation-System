@@ -144,6 +144,98 @@ def recommend_movies(movie_id, n=10):
 
 st.title("🎬 Movie Recommendation System")
 
+st.markdown(
+    "### Discover movies you may enjoy"
+)
+
+st.divider()
+
+st.subheader("🎥 Choose a Movie")
+
+movie_list = movies["title"].sort_values().tolist()
+
+selected_movie = st.selectbox(
+    "Select a movie you like:",
+    movie_list
+)
+
+selected_movie_id = movies[
+    movies["title"] == selected_movie
+]["movieId"].values[0]
+
+selected_genres = movies[
+    movies["title"] == selected_movie
+]["genres"].values[0]
+
+col1, col2 = st.columns(2)
+
+with col1:
+
+    st.markdown("#### Selected Movie")
+
+    st.info(selected_movie)
+
+with col2:
+
+    st.markdown("#### Genres")
+
+    st.info(selected_genres)
+
+
+if st.button(
+    "🎯 Recommend Movies",
+    use_container_width=True
+):
+
+    recommendations = recommend_movies(
+        selected_movie_id
+    )
+
+    st.divider()
+
+    st.subheader(
+        f"🎬 Recommendations for {selected_movie}"
+    )
+
+    for i, (title, genres, score) in enumerate(
+        recommendations, 1
+    ):
+
+        col1, col2 = st.columns(
+            [1, 5]
+        )
+
+        with col1:
+
+            st.markdown(
+                f"## {i}"
+            )
+
+        with col2:
+
+            st.markdown(
+                f"### {title}"
+            )
+
+            st.write(
+                f"🎭 **Genres:** {genres}"
+            )
+
+            st.progress(
+                min(float(score), 1.0)
+            )
+
+            st.caption(
+                f"Hybrid similarity score: {score:.3f}"
+            )
+
+        st.divider()
+
+
+st.caption(
+    "Built with Python, Pandas, Scikit-learn and Streamlit"
+)
+
 st.write(
     "Get personalized movie recommendations using "
     "a hybrid recommendation system."
