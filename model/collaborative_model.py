@@ -10,10 +10,41 @@ user_movie_matrix = ratings.pivot_table(
     values="rating"
 ).fillna(0)
 
-print("User-Movie Matrix Shape:")
-print(user_movie_matrix.shape)
-
 movie_similarity = cosine_similarity(user_movie_matrix.T)
 
-print("\nMovie Similarity Matrix Shape:")
-print(movie_similarity.shape)
+movie_ids = user_movie_matrix.columns
+
+def recommend_movies(movie_id, n=10):
+
+    movie_index = list(movie_ids).index(movie_id)
+
+    similarity_scores = list(
+        enumerate(movie_similarity[movie_index])
+    )
+
+    similarity_scores.sort(
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    recommendations = []
+
+    for index, score in similarity_scores[1:n+1]:
+
+        recommended_movie_id = movie_ids[index]
+
+        movie_title = movies[
+            movies["movieId"] == recommended_movie_id
+        ]["title"].values[0]
+
+        recommendations.append(movie_title)
+
+    return recommendations
+
+
+recommendations = recommend_movies(1)
+
+print("\nMovies similar to Toy Story:")
+
+for movie in recommendations:
+    print(movie)
