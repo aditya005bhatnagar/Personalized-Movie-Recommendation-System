@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+import joblib
 
 st.set_page_config(
     page_title="Movie Recommendation System",
@@ -11,56 +10,40 @@ st.set_page_config(
 
 
 @st.cache_data
-def load_data():
-
-    movies = pd.read_csv("data/movies.csv")
-    ratings = pd.read_csv("data/ratings.csv")
-
-    movies["genres"] = movies["genres"].str.replace(
-        "|", " ", regex=False
-    )
-
-    return movies, ratings
+def load_movies():
+    return pd.read_pickle("saved_models/movies.pkl")
 
 
 @st.cache_resource
-def build_models(movies, ratings):
+def load_models():
 
-    tfidf = TfidfVectorizer()
-
-    tfidf_matrix = tfidf.fit_transform(
-        movies["genres"]
+    tfidf = joblib.load(
+        "saved_models/tfidf.pkl"
     )
 
-    content_similarity = cosine_similarity(
-        tfidf_matrix
+    content_model = joblib.load(
+        "saved_models/content_model.pkl"
     )
 
-    user_movie_matrix = ratings.pivot_table(
-        index="userId",
-        columns="movieId",
-        values="rating"
-    ).fillna(0)
-
-    collaborative_similarity = cosine_similarity(
-        user_movie_matrix.T
+    collaborative_model = joblib.load(
+        "saved_models/collaborative_model.pkl"
     )
 
-    movie_ids = user_movie_matrix.columns
+    movie_ids = joblib.load(
+        "saved_models/movie_ids.pkl"
+    )
 
     return (
-        content_similarity,
-        collaborative_similarity,
+        tfidf,
+        content_model,
+        collaborative_model,
         movie_ids
     )
 
 
-movies, ratings = load_data()
+movies = load_movies()
 
-content_similarity, collaborative_similarity, movie_ids = build_models(
-    movies,
-    ratings
-)
+tfidf, content_model, collaborative_model, movie_ids = load_models()
 
 
 def recommend_movies(movie_id, n=10):
@@ -69,83 +52,90 @@ def recommend_movies(movie_id, n=10):
         movies["movieId"] == movie_id
     ].index[0]
 
-    content_scores = content_similarity[movie_index]
+    # Content-based recommendations
 
-    hybrid_scores = []
+    distances, indices = content_model.kneighbors(
+        tfidf.transform(
+            [movies.iloc[movie_index]["genres"]]
+        ),
+        n_neighbors=n + 1
+    )
 
-    collaborative_indexes = {
-        movie_id: index
-        for index, movie_id in enumerate(movie_ids)
-    }
+    content_movies = []
 
-    if movie_id in collaborative_indexes:
+    for index in indices[0][1:]:
 
-        collaborative_index = collaborative_indexes[movie_id]
+        content_movies.append(
+            movies.iloc[index]["title"]
+        )
 
-        collaborative_scores = collaborative_similarity[
-            collaborative_index
-        ]
+
+    # Collaborative recommendations
+
+    if movie_id in movie_ids:
+
+        collaborative_index = movie_ids.index(
+            movie_id
+        )
+
+        distances, indices = collaborative_model.kneighbors(
+            [collaborative_model._fit_X[
+                collaborative_index
+            ]],
+            n_neighbors=n + 1
+        )
+
+        collaborative_movies = []
+
+        for index in indices[0][1:]:
+
+            recommended_movie_id = movie_ids[index]
+
+            result = movies[
+                movies["movieId"] == recommended_movie_id
+            ]
+
+            if len(result) > 0:
+
+                collaborative_movies.append(
+                    result.iloc[0]["title"]
+                )
 
     else:
 
-        collaborative_scores = []
+        collaborative_movies = []
 
 
-    for i in range(len(movies)):
-
-        current_movie_id = movies.iloc[i]["movieId"]
-
-        if current_movie_id in collaborative_indexes:
-
-            coll_index = collaborative_indexes[current_movie_id]
-
-            collaborative_score = collaborative_scores[coll_index]
-
-        else:
-
-            collaborative_score = 0
-
-        score = (
-            0.5 * content_scores[i]
-            + 0.5 * collaborative_score
-        )
-
-        hybrid_scores.append(score)
-
-
-    movie_scores = list(
-        enumerate(hybrid_scores)
-    )
-
-    movie_scores.sort(
-        key=lambda x: x[1],
-        reverse=True
-    )
+    # Combine recommendations
 
     recommendations = []
 
-    for index, score in movie_scores:
+    for movie in content_movies:
 
-        if movies.iloc[index]["movieId"] != movie_id:
+        if movie not in recommendations:
 
-            recommendations.append(
-                (
-                    movies.iloc[index]["title"],
-                    movies.iloc[index]["genres"],
-                    score
-                )
-            )
+            recommendations.append(movie)
 
-        if len(recommendations) == n:
-            break
 
-    return recommendations
+    for movie in collaborative_movies:
+
+        if movie not in recommendations:
+
+            recommendations.append(movie)
+
+
+    return recommendations[:n]
 
 
 st.title("🎬 Movie Recommendation System")
 
 st.markdown(
     "### Discover movies you may enjoy"
+)
+
+st.write(
+    "This application combines content-based filtering "
+    "and collaborative filtering."
 )
 
 st.divider()
@@ -167,6 +157,7 @@ selected_genres = movies[
     movies["title"] == selected_movie
 ]["genres"].values[0]
 
+
 col1, col2 = st.columns(2)
 
 with col1:
@@ -174,6 +165,7 @@ with col1:
     st.markdown("#### Selected Movie")
 
     st.info(selected_movie)
+
 
 with col2:
 
@@ -197,37 +189,13 @@ if st.button(
         f"🎬 Recommendations for {selected_movie}"
     )
 
-    for i, (title, genres, score) in enumerate(
+    for i, movie in enumerate(
         recommendations, 1
     ):
 
-        col1, col2 = st.columns(
-            [1, 5]
+        st.markdown(
+            f"### {i}. {movie}"
         )
-
-        with col1:
-
-            st.markdown(
-                f"## {i}"
-            )
-
-        with col2:
-
-            st.markdown(
-                f"### {title}"
-            )
-
-            st.write(
-                f"🎭 **Genres:** {genres}"
-            )
-
-            st.progress(
-                min(float(score), 1.0)
-            )
-
-            st.caption(
-                f"Hybrid similarity score: {score:.3f}"
-            )
 
         st.divider()
 
@@ -235,49 +203,3 @@ if st.button(
 st.caption(
     "Built with Python, Pandas, Scikit-learn and Streamlit"
 )
-
-st.write(
-    "Get personalized movie recommendations using "
-    "a hybrid recommendation system."
-)
-
-st.divider()
-
-movie_list = movies["title"].sort_values().tolist()
-
-selected_movie = st.selectbox(
-    "Select a movie:",
-    movie_list
-)
-
-if st.button("Recommend Movies"):
-
-    movie_id = movies[
-        movies["title"] == selected_movie
-    ]["movieId"].values[0]
-
-    recommendations = recommend_movies(
-        movie_id
-    )
-
-    st.subheader(
-        f"Movies Recommended for {selected_movie}"
-    )
-
-    for i, (title, genres, score) in enumerate(
-        recommendations, 1
-    ):
-
-        st.write(
-            f"### {i}. {title}"
-        )
-
-        st.write(
-            f"Genres: {genres}"
-        )
-
-        st.write(
-            f"Hybrid Score: {score:.3f}"
-        )
-
-        st.divider()
