@@ -19,13 +19,8 @@ model = NearestNeighbors(
 
 model.fit(user_movie_matrix)
 
-precision_scores = {
-    k: [] for k in K_VALUES
-}
-
-recall_scores = {
-    k: [] for k in K_VALUES
-}
+precision_scores = {k: [] for k in K_VALUES}
+recall_scores = {k: [] for k in K_VALUES}
 
 users = ratings["userId"].unique()
 
@@ -45,9 +40,7 @@ for count, user_id in enumerate(users, 1):
 
     test_movie = test_rating.iloc[0]["movieId"]
 
-    user_index = user_movie_matrix.index.get_loc(
-        user_id
-    )
+    user_index = user_movie_matrix.index.get_loc(user_id)
 
     user_vector = user_movie_matrix.iloc[
         user_index
@@ -61,7 +54,7 @@ for count, user_id in enumerate(users, 1):
 
     distances, indices = model.kneighbors(
         [user_vector],
-        n_neighbors=6
+        n_neighbors=21
     )
 
     similar_users = indices[0][1:]
@@ -71,22 +64,23 @@ for count, user_id in enumerate(users, 1):
         np.where(user_vector > 0)[0]
     )
 
-    scores = {}
+    weighted_scores = {}
+    similarity_totals = {}
 
     for i in range(len(similar_users)):
+
+        similar_user_index = similar_users[i]
 
         similarity = 1 - similar_distances[i]
 
         similar_ratings = user_movie_matrix.iloc[
-            similar_users[i]
+            similar_user_index
         ]
 
         for movie_id, rating in similar_ratings.items():
 
             movie_position = (
-                user_movie_matrix.columns.get_loc(
-                    movie_id
-                )
+                user_movie_matrix.columns.get_loc(movie_id)
             )
 
             if (
@@ -94,12 +88,26 @@ for count, user_id in enumerate(users, 1):
                 and movie_position not in watched_movies
             ):
 
-                if movie_id not in scores:
-                    scores[movie_id] = 0
+                if movie_id not in weighted_scores:
+                    weighted_scores[movie_id] = 0
+                    similarity_totals[movie_id] = 0
 
-                scores[movie_id] += (
+                weighted_scores[movie_id] += (
                     similarity * rating
                 )
+
+                similarity_totals[movie_id] += similarity
+
+    scores = {}
+
+    for movie_id in weighted_scores:
+
+        if similarity_totals[movie_id] > 0:
+
+            scores[movie_id] = (
+                weighted_scores[movie_id]
+                / similarity_totals[movie_id]
+            )
 
     ranked_movies = sorted(
         scores.items(),
@@ -125,17 +133,11 @@ for count, user_id in enumerate(users, 1):
         )
 
     if count % 500 == 0:
-        print(
-            f"Processed {count} users..."
-        )
-
+        print(f"Processed {count} users...")
 
 print("\nEvaluation completed.\n")
 
-print(
-    "K\tPrecision\tRecall"
-)
-
+print("K\tPrecision\tRecall")
 print("-" * 35)
 
 for k in K_VALUES:

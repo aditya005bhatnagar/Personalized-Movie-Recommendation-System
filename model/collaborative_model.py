@@ -1,7 +1,6 @@
 import pandas as pd
 from sklearn.neighbors import NearestNeighbors
 
-
 def create_user_movie_matrix(ratings):
     user_movie_matrix = ratings.pivot_table(
         index="userId",
@@ -39,7 +38,7 @@ def personalized_recommendations(
 
     distances, indices = user_model.kneighbors(
         [user_movie_matrix.iloc[user_index].values],
-        n_neighbors=6
+        n_neighbors=21
     )
 
     similar_users = indices[0][1:]
@@ -51,31 +50,35 @@ def personalized_recommendations(
         .index
     )
 
-    scores = {}
+    weighted_scores = {}
+    similarity_totals = {}
 
     for i in range(len(similar_users)):
-
         similar_user_index = similar_users[i]
 
         similarity = 1 - similar_distances[i]
 
-        ratings = user_movie_matrix.iloc[
-            similar_user_index
-        ]
+        ratings = user_movie_matrix.iloc[similar_user_index]
 
         for movie_id, rating in ratings.items():
 
-            if (
-                rating > 0
-                and movie_id not in watched_movies
-            ):
+            if rating > 0 and movie_id not in watched_movies:
 
-                if movie_id not in scores:
-                    scores[movie_id] = 0
+                if movie_id not in weighted_scores:
+                    weighted_scores[movie_id] = 0
+                    similarity_totals[movie_id] = 0
 
-                scores[movie_id] += (
-                    similarity * rating
-                )
+                weighted_scores[movie_id] += similarity * rating
+                similarity_totals[movie_id] += similarity
+
+    scores = {}
+
+    for movie_id in weighted_scores:
+        if similarity_totals[movie_id] > 0:
+            scores[movie_id] = (
+                weighted_scores[movie_id]
+                / similarity_totals[movie_id]
+            )
 
     recommended_movies = sorted(
         scores.items(),
@@ -92,7 +95,6 @@ def personalized_recommendations(
         ]
 
         if len(movie) > 0:
-
             result.append({
                 "title": movie.iloc[0]["title"],
                 "genres": movie.iloc[0]["genres"],
