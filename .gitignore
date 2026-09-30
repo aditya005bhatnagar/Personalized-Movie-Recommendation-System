@@ -6,6 +6,7 @@ env/
 
 data/*.csv
 saved_models/
+movie_recommendation.db
 
 .ipynb_checkpoints/
 .vscode/

@@ -1,9 +1,7 @@
 import streamlit as st
 import pandas as pd
 import joblib
-
-from model.collaborative_model import personalized_recommendations
-
+import requests
 
 st.set_page_config(
     page_title="Personalized Movie Recommendation System",
@@ -204,57 +202,214 @@ else:
 
 st.divider()
 
+#---------------- RATE A MOVIE ----------------
+st.divider()
+
+st.subheader("⭐ Rate a Movie")
+
+search_movie = st.text_input(
+    "🔎 Search for a movie",
+    placeholder="Enter movie name..."
+)
+
+if search_movie:
+    filtered_movies = movies[
+        movies["title"].str.contains(
+            search_movie,
+            case=False,
+            na=False
+        )
+    ].head(20)
+else:
+    filtered_movies = movies.head(20)
+
+movie_options = filtered_movies[
+    ["movieId", "title"]
+].values.tolist()
+
+if len(movie_options) > 0:
+
+    selected_movie = st.selectbox(
+        "Choose a movie:",
+        movie_options,
+        format_func=lambda x: x[1]
+    )
+
+else:
+
+    selected_movie = None
+    st.warning("No movies found.")
+
+rating = st.slider(
+    "Give your rating:",
+    min_value=1.0,
+    max_value=5.0,
+    step=0.5,
+    value=5.0
+)
+
+if st.button("⭐ Submit Rating", width="stretch"):
+
+    if selected_movie is None:
+        st.warning("Please select a movie first.")
+
+    else:
+
+        try:
+            response = requests.post(
+                "http://127.0.0.1:8000/ratings",
+                json={
+                    "user_id": selected_user,
+                    "movie_id": int(selected_movie[0]),
+                    "rating": rating
+                }
+            )
+
+            if response.status_code == 200:
+
+                data = response.json()
+
+                if "error" in data:
+                    st.error(data["error"])
+
+                else:
+                    st.success(
+                        "Rating submitted successfully!"
+                    )
+
+            else:
+                st.error("Failed to submit rating.")
+
+        except requests.exceptions.ConnectionError:
+
+            st.error(
+                "Could not connect to FastAPI. "
+                "Make sure the backend is running."
+            )
+st.divider()
+
+st.subheader("📋 My Ratings")
+
+try:
+    response = requests.get(
+        f"http://127.0.0.1:8000/ratings/{selected_user}"
+    )
+
+    if response.status_code == 200:
+
+        data = response.json()
+        ratings = data["ratings"]
+
+        if len(ratings) == 0:
+
+            st.info("You have not submitted any ratings yet.")
+
+        else:
+
+            rating_data = []
+
+            for item in ratings:
+
+                movie = movies[
+                    movies["movieId"] == item["movie_id"]
+                ]
+
+                if len(movie) > 0:
+
+                    rating_data.append({
+                        "Movie": movie.iloc[0]["title"],
+                        "Genres": movie.iloc[0]["genres"],
+                        "Rating": item["rating"]
+                    })
+
+            st.dataframe(
+                rating_data,
+                width="stretch",
+                hide_index=True
+            )
+
+    else:
+
+        st.error("Could not load your ratings.")
+
+except requests.exceptions.ConnectionError:
+
+    st.error(
+        "Could not connect to FastAPI. "
+        "Make sure the backend is running."
+    )
 
 # ---------------- RECOMMENDATION BUTTON ----------------
 
+st.subheader("🍿 Personalized Recommendations")
+
 if st.button(
     "🎯 Generate My Recommendations",
-    use_container_width=True
+    width="stretch"
 ):
 
     with st.spinner(
         "Finding users with similar movie preferences..."
     ):
 
-        recommendations = personalized_recommendations(
-            selected_user,
-            user_model,
-            user_movie_matrix,
-            movies,
-            10
-        )
+        try:
 
-    if len(recommendations) == 0:
-
-        st.warning(
-            "No recommendations found for this user."
-        )
-
-    else:
-
-        st.success(
-            f"Found {len(recommendations)} personalized recommendations!"
-        )
-
-        st.subheader(
-            f"🍿 Recommended Movies for User {selected_user}"
-        )
-
-        for i, movie in enumerate(recommendations, 1):
-
-            st.markdown(
-                f"### #{i} 🎬 {movie['title']}"
+            response = requests.get(
+                f"http://127.0.0.1:8000/recommendations/{selected_user}"
             )
 
-            st.write(
-                f"🎭 **Genres:** {movie['genres']}"
-            )
+            if response.status_code == 200:
 
-            st.write(
-                f"⭐ **Recommendation Score:** {movie['score']:.2f}"
-            )
+                data = response.json()
+                recommendations = data["recommendations"]
 
-            st.divider()
+                if len(recommendations) == 0:
+
+                    st.warning(
+                        "No recommendations found for this user."
+                    )
+
+                else:
+
+                    st.success(
+                        f"Found {len(recommendations)} personalized recommendations!"
+                    )
+
+                    st.subheader(
+                        f"🍿 Recommended Movies for User {selected_user}"
+                    )
+
+                    for i, movie in enumerate(
+                        recommendations, 1
+                    ):
+
+                        st.markdown(
+                            f"### #{i} 🎬 {movie['title']}"
+                        )
+
+                        st.write(
+                            f"🎭 **Genres:** {movie['genres']}"
+                        )
+
+                        st.write(
+                            f"⭐ **Recommendation Score:** "
+                            f"{movie['score']:.2f}"
+                        )
+
+                        st.divider()
+
+            else:
+
+                st.error(
+                    "Backend returned an error."
+                )
+
+        except requests.exceptions.ConnectionError:
+
+            st.error(
+                "Could not connect to the FastAPI backend. "
+                "Make sure the backend is running."
+            )
 # ---------------- FOOTER ----------------
 
 st.divider()
