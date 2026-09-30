@@ -40,67 +40,56 @@ movies = load_movies()
 user_model, user_movie_matrix, user_ids = load_models()
 
 
+# ---------------- HEADER ----------------
+
 st.markdown(
-    """
-    <style>
-
-    .main-title {
-        font-size: 42px;
-        font-weight: 700;
-        text-align: center;
-        margin-bottom: 5px;
-    }
-
-    .subtitle {
-        text-align: center;
-        font-size: 18px;
-        margin-bottom: 30px;
-    }
-
-    .movie-card {
-        padding: 20px;
-        border-radius: 12px;
-        border: 1px solid rgba(128,128,128,0.3);
-        margin-bottom: 12px;
-    }
-
-    .movie-number {
-        font-size: 20px;
-        font-weight: 700;
-    }
-
-    </style>
-    """,
+    "<h1 style='text-align: center;'>🎬 Personalized Movie Recommendation System</h1>",
     unsafe_allow_html=True
 )
 
-
 st.markdown(
-    '<div class="main-title">'
-    '🎬 Personalized Movie Recommendation System'
-    '</div>',
+    "<p style='text-align: center; font-size: 18px;'>"
+    "Discover movies based on users with similar rating patterns"
+    "</p>",
     unsafe_allow_html=True
 )
-
-
-st.markdown(
-    '<div class="subtitle">'
-    'Get movie recommendations based on users with similar rating patterns'
-    '</div>',
-    unsafe_allow_html=True
-)
-
 
 st.divider()
 
 
-st.subheader("👤 Select User")
+# ---------------- SIDEBAR ----------------
 
-selected_user = st.selectbox(
-    "Choose a user:",
-    user_ids
-)
+with st.sidebar:
 
+    st.header("🎯 Recommendation Settings")
+
+    selected_user = st.selectbox(
+        "Select User",
+        user_ids
+    )
+
+    st.divider()
+
+    st.markdown("### 🤖 Recommendation Method")
+
+    st.info(
+        "User-Based Collaborative Filtering"
+    )
+
+    st.markdown("### 🔍 Similarity")
+
+    st.info(
+        "Cosine Distance"
+    )
+
+    st.divider()
+
+    st.caption(
+        "Recommendations are generated from the rating patterns of similar users."
+    )
+
+
+# ---------------- USER DATA ----------------
 
 user_index = user_ids.index(selected_user)
 
@@ -113,56 +102,113 @@ rated_movies = user_ratings[
 )
 
 
-col1, col2 = st.columns(2)
+# ---------------- USER SUMMARY ----------------
+
+st.markdown(
+    '<div class="section-title">👤 User Profile</div>',
+    unsafe_allow_html=True
+)
+
+
+col1, col2, col3 = st.columns(3)
 
 
 with col1:
 
-    st.markdown("### 👤 User ID")
-
-    st.info(
-        f"User {selected_user}"
+    st.metric(
+        "User ID",
+        selected_user
     )
 
 
 with col2:
 
-    st.markdown("### 🎥 Movies Rated")
+    st.metric(
+        "Movies Rated",
+        len(rated_movies)
+    )
 
-    st.info(
-        f"{len(rated_movies)} movies"
+
+with col3:
+
+    if len(rated_movies) > 0:
+        average_rating = rated_movies.mean()
+    else:
+        average_rating = 0
+
+    st.metric(
+        "Average Rating",
+        f"{average_rating:.2f} ⭐"
     )
 
 
 st.divider()
 
 
-st.subheader("⭐ Movies You Rated Highly")
+# ---------------- HIGHLY RATED MOVIES ----------------
+
+st.markdown(
+    '<div class="section-title">⭐ Your Highly Rated Movies</div>',
+    unsafe_allow_html=True
+)
 
 
 top_rated = rated_movies.head(5)
 
 
-for movie_id, rating in top_rated.items():
+if len(top_rated) == 0:
 
-    movie = movies[
-        movies["movieId"] == movie_id
-    ]
+    st.info(
+        "This user has not rated any movies."
+    )
 
-    if len(movie) > 0:
+else:
 
-        title = movie.iloc[0]["title"]
+    cols = st.columns(5)
 
-        st.write(
-            f"⭐ **{title}** — Rating: {rating}"
-        )
+    for i, (movie_id, rating) in enumerate(
+        top_rated.items()
+    ):
+
+        movie = movies[
+            movies["movieId"] == movie_id
+        ]
+
+        if len(movie) > 0:
+
+            title = movie.iloc[0]["title"]
+
+            with cols[i]:
+
+                st.markdown(
+                    f"""
+                    <div class="movie-card">
+
+                    <div class="movie-title">
+                    🎬
+                    </div>
+
+                    <br>
+
+                    <b>{title}</b>
+
+                    <br><br>
+
+                    ⭐ Rating: {rating}
+
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
 
 st.divider()
 
 
+# ---------------- RECOMMENDATION BUTTON ----------------
+
 if st.button(
-    "🎯 Get Personalized Recommendations",
+    "🎯 Generate My Recommendations",
     use_container_width=True
 ):
 
@@ -177,7 +223,6 @@ if st.button(
             movies,
             10
         )
-
 
     if len(recommendations) == 0:
 
@@ -195,39 +240,25 @@ if st.button(
             f"🍿 Recommended Movies for User {selected_user}"
         )
 
-
-        for i, movie in enumerate(
-            recommendations,
-            1
-        ):
+        for i, movie in enumerate(recommendations, 1):
 
             st.markdown(
-                f"""
-                <div class="movie-card">
-
-                <span class="movie-number">
-                {i}. 🎬 {movie['title']}
-                </span>
-
-                <br><br>
-
-                <b>Genres:</b>
-                {movie['genres']}
-
-                <br>
-
-                <b>Recommendation Score:</b>
-                {movie['score']:.2f}
-
-                </div>
-                """,
-                unsafe_allow_html=True
+                f"### #{i} 🎬 {movie['title']}"
             )
 
+            st.write(
+                f"🎭 **Genres:** {movie['genres']}"
+            )
+
+            st.write(
+                f"⭐ **Recommendation Score:** {movie['score']:.2f}"
+            )
+
+            st.divider()
+# ---------------- FOOTER ----------------
 
 st.divider()
 
-
 st.caption(
-    "Built with Python • Pandas • Scikit-learn • Streamlit"
+    "Built with Python • Pandas • Scikit-learn • Streamlit • User-Based Collaborative Filtering"
 )
