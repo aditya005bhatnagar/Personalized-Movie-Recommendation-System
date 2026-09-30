@@ -3,7 +3,7 @@ import pandas as pd
 import joblib
 
 st.set_page_config(
-    page_title="Movie Recommendation System",
+    page_title="Personalized Movie Recommendation System",
     page_icon="🎬",
     layout="wide"
 )
@@ -17,181 +17,283 @@ def load_movies():
 @st.cache_resource
 def load_models():
 
-    tfidf = joblib.load(
-        "saved_models/tfidf.pkl"
+    user_model = joblib.load(
+        "saved_models/user_model.pkl"
     )
 
-    content_model = joblib.load(
-        "saved_models/content_model.pkl"
+    user_movie_matrix = joblib.load(
+        "saved_models/user_movie_matrix.pkl"
     )
 
-    collaborative_model = joblib.load(
-        "saved_models/collaborative_model.pkl"
-    )
-
-    movie_ids = joblib.load(
-        "saved_models/movie_ids.pkl"
+    user_ids = joblib.load(
+        "saved_models/user_ids.pkl"
     )
 
     return (
-        tfidf,
-        content_model,
-        collaborative_model,
-        movie_ids
+        user_model,
+        user_movie_matrix,
+        user_ids
     )
 
 
 movies = load_movies()
 
-tfidf, content_model, collaborative_model, movie_ids = load_models()
+user_model, user_movie_matrix, user_ids = load_models()
 
 
-def recommend_movies(movie_id, n=10):
 
-    movie_index = movies[
-        movies["movieId"] == movie_id
-    ].index[0]
+def personalized_recommendations(user_id, n=10):
 
-    # Content-based recommendations
+    if user_id not in user_ids:
+        return []
 
-    distances, indices = content_model.kneighbors(
-        tfidf.transform(
-            [movies.iloc[movie_index]["genres"]]
-        ),
-        n_neighbors=n + 1
+    user_index = user_ids.index(user_id)
+
+    distances, indices = user_model.kneighbors(
+        [user_movie_matrix.iloc[user_index].values],
+        n_neighbors=6
     )
 
-    content_movies = []
+    similar_users = indices[0][1:]
+    similar_distances = distances[0][1:]
 
-    for index in indices[0][1:]:
+    watched_movies = set(
+        user_movie_matrix.iloc[user_index]
+        .loc[lambda x: x > 0]
+        .index
+    )
 
-        content_movies.append(
-            movies.iloc[index]["title"]
-        )
+    scores = {}
 
+    for i in range(len(similar_users)):
 
-    # Collaborative recommendations
+        similar_user_index = similar_users[i]
 
-    if movie_id in movie_ids:
+        similarity = 1 - similar_distances[i]
 
-        collaborative_index = movie_ids.index(
-            movie_id
-        )
+        ratings = user_movie_matrix.iloc[
+            similar_user_index
+        ]
 
-        distances, indices = collaborative_model.kneighbors(
-            [collaborative_model._fit_X[
-                collaborative_index
-            ]],
-            n_neighbors=n + 1
-        )
+        for movie_id, rating in ratings.items():
 
-        collaborative_movies = []
+            if (
+                rating > 0
+                and movie_id not in watched_movies
+            ):
 
-        for index in indices[0][1:]:
+                if movie_id not in scores:
+                    scores[movie_id] = 0
 
-            recommended_movie_id = movie_ids[index]
-
-            result = movies[
-                movies["movieId"] == recommended_movie_id
-            ]
-
-            if len(result) > 0:
-
-                collaborative_movies.append(
-                    result.iloc[0]["title"]
+                scores[movie_id] += (
+                    similarity * rating
                 )
 
-    else:
+    recommended_movies = sorted(
+        scores.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )
 
-        collaborative_movies = []
+    result = []
 
+    for movie_id, score in recommended_movies:
 
-    # Combine recommendations
+        movie = movies[
+            movies["movieId"] == movie_id
+        ]
 
-    recommendations = []
+        if len(movie) > 0:
 
-    for movie in content_movies:
+            result.append({
+                "title": movie.iloc[0]["title"],
+                "genres": movie.iloc[0]["genres"],
+                "score": score
+            })
 
-        if movie not in recommendations:
+        if len(result) == n:
+            break
 
-            recommendations.append(movie)
+    return result
 
-
-    for movie in collaborative_movies:
-
-        if movie not in recommendations:
-
-            recommendations.append(movie)
-
-
-    return recommendations[:n]
-
-
-st.title("🎬 Movie Recommendation System")
 
 st.markdown(
-    "### Discover movies you may enjoy"
+    """
+    <style>
+
+    .main-title {
+        font-size: 42px;
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 5px;
+    }
+
+    .subtitle {
+        text-align: center;
+        font-size: 18px;
+        margin-bottom: 30px;
+    }
+
+    .movie-card {
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px solid rgba(128,128,128,0.3);
+        margin-bottom: 12px;
+    }
+
+    .movie-number {
+        font-size: 20px;
+        font-weight: 700;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
+
+st.markdown(
+    '<div class="main-title">'
+    '🎬 Personalized Movie Recommendation System'
+    '</div>',
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    '<div class="subtitle">'
+    'Get movie recommendations based on users with similar rating patterns'
+    '</div>',
+    unsafe_allow_html=True
+)
 
 st.divider()
 
-st.subheader("🎥 Choose a Movie")
 
-movie_list = movies["title"].sort_values().tolist()
+st.subheader("👤 Select User")
 
-selected_movie = st.selectbox(
-    "Select a movie you like:",
-    movie_list
+selected_user = st.selectbox(
+    "Choose a user:",
+    user_ids
 )
 
-selected_movie_id = movies[
-    movies["title"] == selected_movie
-]["movieId"].values[0]
 
-selected_genres = movies[
-    movies["title"] == selected_movie
-]["genres"].values[0]
+user_index = user_ids.index(selected_user)
+
+user_ratings = user_movie_matrix.iloc[user_index]
+
+rated_movies = user_ratings[
+    user_ratings > 0
+].sort_values(
+    ascending=False
+)
 
 
 col1, col2 = st.columns(2)
 
 with col1:
 
-    st.markdown("#### Selected Movie")
+    st.markdown("### 👤 User ID")
 
-    st.info(selected_movie)
+    st.info(
+        f"User {selected_user}"
+    )
 
 
 with col2:
 
-    st.markdown("#### Genres")
+    st.markdown("### 🎥 Movies Rated")
 
-    st.info(selected_genres)
+    st.info(
+        f"{len(rated_movies)} movies"
+    )
+
+
+st.divider()
+
+
+st.subheader("⭐ Movies You Rated Highly")
+
+top_rated = rated_movies.head(5)
+
+for movie_id, rating in top_rated.items():
+
+    movie = movies[
+        movies["movieId"] == movie_id
+    ]
+
+    if len(movie) > 0:
+
+        title = movie.iloc[0]["title"]
+
+        st.write(
+            f"⭐ **{title}** — Rating: {rating}"
+        )
+
+
+st.divider()
 
 
 if st.button(
-    "🎯 Recommend Movies",
+    "🎯 Get Personalized Recommendations",
     use_container_width=True
 ):
 
-    recommendations = recommend_movies(
-        selected_movie_id
-    )
-
-    st.divider()
-
-    st.subheader(
-        f"🎬 Recommendations for {selected_movie}"
-    )
-
-    for i, movie in enumerate(
-        recommendations, 1
+    with st.spinner(
+        "Finding users with similar movie preferences..."
     ):
 
-        st.markdown(
-            f"### {i}. {movie}"
+        recommendations = personalized_recommendations(
+            selected_user,
+            10
         )
 
-        st.divider()
+    if len(recommendations) == 0:
 
+        st.warning(
+            "No recommendations found for this user."
+        )
+
+    else:
+
+        st.success(
+            f"Found {len(recommendations)} personalized recommendations!"
+        )
+
+        st.subheader(
+            f"🍿 Recommended Movies for User {selected_user}"
+        )
+
+        for i, movie in enumerate(
+            recommendations,
+            1
+        ):
+
+            st.markdown(
+                f"""
+                <div class="movie-card">
+
+                <span class="movie-number">
+                {i}. 🎬 {movie['title']}
+                </span>
+
+                <br><br>
+
+                <b>Genres:</b>
+                {movie['genres']}
+
+                <br>
+
+                <b>Recommendation Score:</b>
+                {movie['score']:.2f}
+
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+
+st.divider()
+
+st.caption(
+    "Built with Python • Pandas • Scikit-learn • Streamlit"
+)

@@ -83,3 +83,25 @@ print("Users:", len(user_movie_matrix))
 print("Rated Movies:", len(user_movie_matrix.columns))
 
 print("\nModels saved in saved_models/")
+
+user_model = NearestNeighbors(
+    metric="cosine",
+    algorithm="brute"
+)
+
+user_model.fit(user_movie_matrix)
+
+joblib.dump(
+    user_model,
+    "saved_models/user_model.pkl"
+)
+
+joblib.dump(
+    user_movie_matrix,
+    "saved_models/user_movie_matrix.pkl"
+)
+
+joblib.dump(
+    user_movie_matrix.index.tolist(),
+    "saved_models/user_ids.pkl"
+)
