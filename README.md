@@ -1,8 +1,10 @@
 # 🎬 Personalized Movie Recommendation System
 
-A machine learning based movie recommendation system that provides **personalized movie recommendations based on user rating patterns**.
+A machine learning based movie recommendation system that provides personalized movie recommendations based on user rating patterns.
 
-The project uses the MovieLens dataset and combines recommendation techniques with a Streamlit web application.
+The project uses the MovieLens dataset and user-based collaborative filtering to identify users with similar movie preferences and recommend movies they may enjoy.
+
+The system is implemented using Python, Scikit-learn, Pandas, Joblib, and Streamlit.
 
 ---
 
@@ -35,5 +37,7 @@ Analyze Movies Rated by Similar Users
 Remove Movies Already Rated
      ↓
 Calculate Recommendation Scores
+     ↓
+Rank Movies
      ↓
 Return Top 10 Movies
