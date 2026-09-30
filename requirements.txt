@@ -1,4 +1,9 @@
 pandas
+numpy
 scikit-learn
-streamlit
 joblib
+streamlit
+fastapi
+uvicorn
+requests
+sqlalchemy

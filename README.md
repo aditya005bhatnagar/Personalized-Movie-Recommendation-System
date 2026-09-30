@@ -1,43 +1,72 @@
 # 🎬 Personalized Movie Recommendation System
 
-A machine learning based movie recommendation system that provides personalized movie recommendations based on user rating patterns.
+A personalized movie recommendation system built using **User-Based Collaborative Filtering** and **Cosine Similarity**.
 
-The project uses the MovieLens dataset and user-based collaborative filtering to identify users with similar movie preferences and recommend movies they may enjoy.
-
-The system is implemented using Python, Scikit-learn, Pandas, Joblib, and Streamlit.
+The system analyzes users' movie-rating patterns, identifies users with similar preferences, and recommends movies that the target user has not already rated.
 
 ---
 
-## 🚀 Features
+## 📌 Project Overview
 
-- 👤 Personalized recommendations for individual users
-- 🤝 User-based collaborative filtering
-- 🎯 Finds users with similar movie-rating patterns
-- ⭐ Uses ratings from similar users to generate recommendations
-- 🚫 Removes movies the selected user has already rated
-- 🎬 Displays movie genres and recommendation scores
-- 🖥️ Interactive Streamlit web application
-- 💾 Trained models saved using Joblib
+Traditional movie recommendation systems often recommend movies based only on general popularity or movie content.
+
+This project uses **User-Based Collaborative Filtering** to generate personalized recommendations based on the rating behavior of similar users.
+
+The final system provides:
+
+- Personalized movie recommendations
+- User-based collaborative filtering
+- Cosine similarity
+- Similar-user analysis
+- Similarity-weighted recommendation scoring
+- Exclusion of already-rated movies
+- Movie search
+- User ratings
+- SQLite database for new ratings
+- FastAPI backend
+- Streamlit frontend
+- Precision@K and Recall@K evaluation
 
 ---
 
-## 🧠 How It Works
+## 🎯 Objectives
 
-The recommendation process follows these steps:
+1. Build a personalized movie recommendation system.
+2. Identify users with similar movie-rating patterns.
+3. Recommend movies based on ratings from similar users.
+4. Prevent already-rated movies from appearing in recommendations.
+5. Provide a simple interactive web interface.
+6. Evaluate the recommendation model using Precision@K and Recall@K.
+
+---
+
+## 🧠 Recommendation Method
+
+The project uses **User-Based Collaborative Filtering**.
+
+### Working Process
 
 ```text
-Select User
-     ↓
-Create User-Movie Rating Matrix
-     ↓
-Find Similar Users
-     ↓
-Analyze Movies Rated by Similar Users
-     ↓
-Remove Movies Already Rated
-     ↓
-Calculate Recommendation Scores
-     ↓
-Rank Movies
-     ↓
-Return Top 10 Movies
+MovieLens Dataset
+       ↓
+Data Preprocessing
+       ↓
+User-Movie Rating Matrix
+       ↓
+User-Based Collaborative Filtering
+       ↓
+Cosine Similarity
+       ↓
+Find 20 Similar Users
+       ↓
+Analyze Their Ratings
+       ↓
+Remove Already-Rated Movies
+       ↓
+Similarity-Weighted Average Score
+       ↓
+Top 10 Recommendations
+       ↓
+FastAPI Backend
+       ↓
+Streamlit Application
