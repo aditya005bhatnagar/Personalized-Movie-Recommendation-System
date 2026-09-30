@@ -1,50 +1,105 @@
 import pandas as pd
-from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.neighbors import NearestNeighbors
 
-ratings = pd.read_csv("data/ratings.csv")
-movies = pd.read_csv("data/movies.csv")
 
-user_movie_matrix = ratings.pivot_table(
-    index="userId",
-    columns="movieId",
-    values="rating"
-).fillna(0)
+def create_user_movie_matrix(ratings):
+    user_movie_matrix = ratings.pivot_table(
+        index="userId",
+        columns="movieId",
+        values="rating"
+    ).fillna(0)
 
-movie_similarity = cosine_similarity(user_movie_matrix.T)
+    return user_movie_matrix
 
-movie_ids = user_movie_matrix.columns
 
-def recommend_movies(movie_id, n=10):
-
-    movie_index = list(movie_ids).index(movie_id)
-
-    similarity_scores = list(
-        enumerate(movie_similarity[movie_index])
+def train_user_model(user_movie_matrix):
+    user_model = NearestNeighbors(
+        metric="cosine",
+        algorithm="brute"
     )
 
-    similarity_scores.sort(
+    user_model.fit(user_movie_matrix)
+
+    return user_model
+
+
+def personalized_recommendations(
+    user_id,
+    user_model,
+    user_movie_matrix,
+    movies,
+    n=10
+):
+    user_ids = user_movie_matrix.index.tolist()
+
+    if user_id not in user_ids:
+        return []
+
+    user_index = user_ids.index(user_id)
+
+    distances, indices = user_model.kneighbors(
+        [user_movie_matrix.iloc[user_index].values],
+        n_neighbors=6
+    )
+
+    similar_users = indices[0][1:]
+    similar_distances = distances[0][1:]
+
+    watched_movies = set(
+        user_movie_matrix.iloc[user_index]
+        .loc[lambda x: x > 0]
+        .index
+    )
+
+    scores = {}
+
+    for i in range(len(similar_users)):
+
+        similar_user_index = similar_users[i]
+
+        similarity = 1 - similar_distances[i]
+
+        ratings = user_movie_matrix.iloc[
+            similar_user_index
+        ]
+
+        for movie_id, rating in ratings.items():
+
+            if (
+                rating > 0
+                and movie_id not in watched_movies
+            ):
+
+                if movie_id not in scores:
+                    scores[movie_id] = 0
+
+                scores[movie_id] += (
+                    similarity * rating
+                )
+
+    recommended_movies = sorted(
+        scores.items(),
         key=lambda x: x[1],
         reverse=True
     )
 
-    recommendations = []
+    result = []
 
-    for index, score in similarity_scores[1:n+1]:
+    for movie_id, score in recommended_movies:
 
-        recommended_movie_id = movie_ids[index]
+        movie = movies[
+            movies["movieId"] == movie_id
+        ]
 
-        movie_title = movies[
-            movies["movieId"] == recommended_movie_id
-        ]["title"].values[0]
+        if len(movie) > 0:
 
-        recommendations.append(movie_title)
+            result.append({
+                "title": movie.iloc[0]["title"],
+                "genres": movie.iloc[0]["genres"],
+                "score": score
+            })
 
-    return recommendations
+        if len(result) == n:
+            break
 
-
-recommendations = recommend_movies(1)
-
-print("\nMovies similar to Toy Story:")
-
-for movie in recommendations:
-    print(movie)
+    return result
