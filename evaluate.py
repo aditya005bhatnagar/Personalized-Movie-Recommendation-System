@@ -2,8 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 
-
-K = 10
+K_VALUES = [5, 10, 20]
 
 ratings = pd.read_csv("data/ratings.csv")
 
@@ -13,7 +12,6 @@ user_movie_matrix = ratings.pivot_table(
     values="rating"
 ).fillna(0)
 
-
 model = NearestNeighbors(
     metric="cosine",
     algorithm="brute"
@@ -21,13 +19,15 @@ model = NearestNeighbors(
 
 model.fit(user_movie_matrix)
 
+precision_scores = {
+    k: [] for k in K_VALUES
+}
 
-precision_scores = []
-recall_scores = []
-
+recall_scores = {
+    k: [] for k in K_VALUES
+}
 
 users = ratings["userId"].unique()
-
 
 for count, user_id in enumerate(users, 1):
 
@@ -81,41 +81,48 @@ for count, user_id in enumerate(users, 1):
             similar_users[i]
         ]
 
-        for movie_index, rating in similar_ratings.items():
+        for movie_id, rating in similar_ratings.items():
+
+            movie_position = (
+                user_movie_matrix.columns.get_loc(
+                    movie_id
+                )
+            )
 
             if (
                 rating > 0
-                and user_movie_matrix.columns.get_loc(movie_index)
-                not in watched_movies
+                and movie_position not in watched_movies
             ):
 
-                if movie_index not in scores:
-                    scores[movie_index] = 0
+                if movie_id not in scores:
+                    scores[movie_id] = 0
 
-                scores[movie_index] += (
+                scores[movie_id] += (
                     similarity * rating
                 )
 
-    recommendations = sorted(
+    ranked_movies = sorted(
         scores.items(),
         key=lambda x: x[1],
         reverse=True
-    )[:K]
-
-    recommended_movies = {
-        movie_id
-        for movie_id, score in recommendations
-    }
-
-    hit = test_movie in recommended_movies
-
-    precision_scores.append(
-        1 / K if hit else 0
     )
 
-    recall_scores.append(
-        1 if hit else 0
-    )
+    for k in K_VALUES:
+
+        recommendations = {
+            movie_id
+            for movie_id, score in ranked_movies[:k]
+        }
+
+        hit = test_movie in recommendations
+
+        precision_scores[k].append(
+            1 / k if hit else 0
+        )
+
+        recall_scores[k].append(
+            1 if hit else 0
+        )
 
     if count % 500 == 0:
         print(
@@ -123,14 +130,24 @@ for count, user_id in enumerate(users, 1):
         )
 
 
-print("\nEvaluation completed.")
+print("\nEvaluation completed.\n")
 
 print(
-    f"Precision@{K}: "
-    f"{np.mean(precision_scores):.4f}"
+    "K\tPrecision\tRecall"
 )
 
-print(
-    f"Recall@{K}: "
-    f"{np.mean(recall_scores):.4f}"
-)
+print("-" * 35)
+
+for k in K_VALUES:
+
+    precision = np.mean(
+        precision_scores[k]
+    )
+
+    recall = np.mean(
+        recall_scores[k]
+    )
+
+    print(
+        f"{k}\t{precision:.4f}\t\t{recall:.4f}"
+    )
