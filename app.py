@@ -133,10 +133,6 @@ st.markdown(
     "### Discover movies you may enjoy"
 )
 
-st.write(
-    "This application combines content-based filtering "
-    "and collaborative filtering."
-)
 
 st.divider()
 
@@ -199,7 +195,3 @@ if st.button(
 
         st.divider()
 
-
-st.caption(
-    "Built with Python, Pandas, Scikit-learn and Streamlit"
-)
