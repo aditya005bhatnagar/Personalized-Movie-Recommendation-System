@@ -3,8 +3,19 @@ import pandas as pd
 import joblib
 import requests
 
+from api.database import SessionLocal, Rating
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if "movie_user_id" not in st.session_state:
+    st.session_state.movie_user_id = None
+
+if "username" not in st.session_state:
+    st.session_state.username = None
+
 st.set_page_config(
-    page_title="Personalized Movie Recommendation System",
+    page_title="CineMatch - Personalized Movie Recommendation System",
     page_icon="🎬",
     layout="wide"
 )
@@ -33,6 +44,91 @@ def load_models():
     return user_model, user_movie_matrix, user_ids
 
 
+
+if not st.session_state.logged_in:
+
+    tab1, tab2 = st.tabs(["Login", "Register"])
+
+    with tab1:
+        st.subheader("Login")
+
+        email = st.text_input(
+            "Email",
+            key="login_email"
+        )
+
+        password = st.text_input(
+            "Password",
+            type="password",
+            key="login_password"
+        )
+
+        if st.button("Login", width="stretch"):
+            response = requests.post(
+                "http://127.0.0.1:8000/login",
+                json={
+                    "email": email,
+                    "password": password
+                }
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+
+                if data.get("message") == "Login successful":
+                    st.session_state.logged_in = True
+                    st.session_state.user_id = data["user_id"]
+                    st.session_state.username = data["username"]
+                    st.session_state.movie_user_id = data.get("movie_user_id")
+                    st.rerun()
+                else:
+                    st.error(data.get("message"))
+            else:
+                st.error("Unable to connect to the backend.")
+
+    with tab2:
+        st.subheader("Create Account")
+
+        username = st.text_input(
+            "Username",
+            key="register_username"
+        )
+
+        email = st.text_input(
+            "Email",
+            key="register_email"
+        )
+
+        password = st.text_input(
+            "Password",
+            type="password",
+            key="register_password"
+        )
+
+        if st.button("Register", width="stretch"):
+            response = requests.post(
+                "http://127.0.0.1:8000/register",
+                json={
+                    "username": username,
+                    "email": email,
+                    "password": password
+                }
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+
+                if data.get("message") == "Registration successful":
+                    st.success(
+                        "Registration successful! You can now login."
+                    )
+                else:
+                    st.error(data.get("message"))
+            else:
+                st.error("Unable to connect to the backend.")
+
+    st.stop()
+
 movies = load_movies()
 
 user_model, user_movie_matrix, user_ids = load_models()
@@ -41,7 +137,12 @@ user_model, user_movie_matrix, user_ids = load_models()
 # ---------------- HEADER ----------------
 
 st.markdown(
-    "<h1 style='text-align: center;'>🎬 Personalized Movie Recommendation System</h1>",
+    "<h1 style='text-align: center;'>🎬 CineMatch</h1>",
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    "<h3 style='text-align: center;'>Personalized Movie Recommendation System</h3>",
     unsafe_allow_html=True
 )
 
@@ -58,12 +159,25 @@ st.divider()
 # ---------------- SIDEBAR ----------------
 
 with st.sidebar:
-
+    
+    if st.button("Logout", width="stretch"):
+       st.session_state.logged_in = False
+       st.session_state.user_id = None
+       st.session_state.username = None
+       st.session_state.movie_user_id = None
+       st.rerun()
+    
     st.header("🎯 Recommendation Settings")
 
-    selected_user = st.selectbox(
-        "Select User",
-        user_ids
+    
+    selected_user = st.session_state.user_id
+
+    st.write(
+        f"👤 User: {st.session_state.username}"
+    )
+
+    st.write(
+        f"User ID: {selected_user}"
     )
 
     st.divider()
@@ -89,17 +203,20 @@ with st.sidebar:
 
 # ---------------- USER DATA ----------------
 
-user_index = user_ids.index(selected_user)
+db = SessionLocal()
 
-user_ratings = user_movie_matrix.iloc[user_index]
+user_ratings_db = db.query(Rating).filter(
+    Rating.user_id == selected_user
+).all()
 
-rated_movies = user_ratings[
-    user_ratings > 0
-].sort_values(
-    ascending=False
+db.close()
+
+rated_movies = pd.Series(
+    {
+        rating.movie_id: rating.rating
+        for rating in user_ratings_db
+    }
 )
-
-
 # ---------------- USER SUMMARY ----------------
 
 st.markdown(
@@ -130,7 +247,7 @@ with col2:
 with col3:
 
     if len(rated_movies) > 0:
-        average_rating = rated_movies.mean()
+        average_rating = rated_movies.mean() if len(rated_movies) > 0 else 0
     else:
         average_rating = 0
 
@@ -355,8 +472,8 @@ if st.button(
         try:
 
             response = requests.get(
-                f"http://127.0.0.1:8000/recommendations/{selected_user}"
-            )
+               f"http://127.0.0.1:8000/recommendations/{selected_user}"
+            )      
 
             if response.status_code == 200:
 

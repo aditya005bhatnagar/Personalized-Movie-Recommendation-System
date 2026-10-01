@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, Float
+from sqlalchemy import create_engine, Column, Integer, Float,String
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 
@@ -17,7 +17,14 @@ SessionLocal = sessionmaker(
 
 Base = declarative_base()
 
+class User(Base):
+    __tablename__ = "users"
 
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password = Column(String, nullable=False)
+    movie_user_id = Column(Integer, nullable=True)
 class Rating(Base):
 
     __tablename__ = "ratings"

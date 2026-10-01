@@ -1,72 +1,43 @@
-# 🎬 Personalized Movie Recommendation System
+# 🎬 CineMatch - Personalized Movie Recommendation System
 
-A personalized movie recommendation system built using **User-Based Collaborative Filtering** and **Cosine Similarity**.
+CineMatch is a personalized movie recommendation system that uses **User-Based Collaborative Filtering** to recommend movies based on user rating patterns.
 
-The system analyzes users' movie-rating patterns, identifies users with similar preferences, and recommends movies that the target user has not already rated.
-
----
-
-## 📌 Project Overview
-
-Traditional movie recommendation systems often recommend movies based only on general popularity or movie content.
-
-This project uses **User-Based Collaborative Filtering** to generate personalized recommendations based on the rating behavior of similar users.
-
-The final system provides:
-
-- Personalized movie recommendations
-- User-based collaborative filtering
-- Cosine similarity
-- Similar-user analysis
-- Similarity-weighted recommendation scoring
-- Exclusion of already-rated movies
-- Movie search
-- User ratings
-- SQLite database for new ratings
-- FastAPI backend
-- Streamlit frontend
-- Precision@K and Recall@K evaluation
+The application provides a **Streamlit frontend** and a **FastAPI backend**, along with user registration, login, movie ratings, and MovieLens user integration.
 
 ---
 
-## 🎯 Objectives
+## 🚀 Features
 
-1. Build a personalized movie recommendation system.
-2. Identify users with similar movie-rating patterns.
-3. Recommend movies based on ratings from similar users.
-4. Prevent already-rated movies from appearing in recommendations.
-5. Provide a simple interactive web interface.
-6. Evaluate the recommendation model using Precision@K and Recall@K.
+- 🎬 Personalized movie recommendations
+- 👤 User registration and login
+- 🔐 Password hashing
+- ⭐ Movie rating system
+- 👥 User-Based Collaborative Filtering
+- 🔗 MovieLens user integration
+- 🆔 CineMatch User ID to MovieLens User ID mapping
+- 🗄️ SQLite database for user accounts and ratings
+- ⚡ FastAPI backend
+- 🖥️ Streamlit frontend
+- 🎯 Personalized recommendations based on user ratings
+- 📊 Movie and user information through REST APIs
 
 ---
 
-## 🧠 Recommendation Method
+## 🧠 Recommendation System
 
-The project uses **User-Based Collaborative Filtering**.
+CineMatch uses **User-Based Collaborative Filtering**.
 
-### Working Process
+The system identifies users with similar movie-rating patterns and uses those patterns to generate movie recommendations.
+
+### Existing MovieLens User
 
 ```text
-MovieLens Dataset
-       ↓
-Data Preprocessing
-       ↓
-User-Movie Rating Matrix
-       ↓
-User-Based Collaborative Filtering
-       ↓
-Cosine Similarity
-       ↓
-Find 20 Similar Users
-       ↓
-Analyze Their Ratings
-       ↓
-Remove Already-Rated Movies
-       ↓
-Similarity-Weighted Average Score
-       ↓
-Top 10 Recommendations
-       ↓
-FastAPI Backend
-       ↓
-Streamlit Application
+CineMatch User
+      ↓
+MovieLens User ID
+      ↓
+Existing MovieLens ratings
+      ↓
+Collaborative Filtering Model
+      ↓
+Personalized Recommendations
