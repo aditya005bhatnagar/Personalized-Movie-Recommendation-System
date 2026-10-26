@@ -24,7 +24,7 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     password = Column(String, nullable=False)
-    movie_user_id = Column(Integer, nullable=True)
+    
 class Rating(Base):
 
     __tablename__ = "ratings"
