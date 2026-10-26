@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 
 from api.database import SessionLocal, Rating
 
-
+load_dotenv()
 
 
 
@@ -984,34 +984,68 @@ import os
 API_URL = "http://127.0.0.1:8000"
 
 
+
 @st.cache_data(ttl=3600)
 def get_movie_description(title):
     """Fetch a movie description from TMDB."""
-    token = os.getenv("TMDB_TOKEN")
+    if not TMDB_TOKEN:
+        return "TMDB token not found. Check your .env file."
 
-    if not token:
-        return "Movie description is unavailable. Check your TMDB_TOKEN."
+    # Remove the release year from titles such as Toy Story (1995)
+    title = str(title).strip()
+    year_match = re.search(r"\((\d{4})\)\s*$", title)
+    year = year_match.group(1) if year_match else None
+    clean_title = re.sub(r"\s*\(\d{4}\)\s*$", "", title).strip()
 
     try:
+        params = {
+            "query": clean_title,
+            "language": "en-US",
+            "include_adult": False,
+        }
+
+        if year:
+            params["year"] = year
+
         response = requests.get(
             "https://api.themoviedb.org/3/search/movie",
-            headers={"Authorization": f"Bearer {token}"},
-            params={"query": title, "include_adult": False},
-            timeout=10
+            headers=TMDB_HEADERS,
+            params=params,
+            timeout=15,
         )
         response.raise_for_status()
         results = response.json().get("results", [])
 
-        if results:
-            return results[0].get(
-                "overview", "No description is available for this movie."
-            ) or "No description is available for this movie."
+        if not results:
+            return "No movie description found on TMDB."
 
-        return "No description found."
+        # Prefer the closest matching movie title
+        target = clean_title.casefold()
+        best_result = max(
+            results,
+            key=lambda movie: SequenceMatcher(
+                None,
+                target,
+                (
+                    movie.get("title")
+                    or movie.get("original_title")
+                    or ""
+                ).casefold(),
+            ).ratio(),
+        )
 
-    except requests.RequestException:
-        return "Unable to load the description right now."
+        description = best_result.get("overview", "").strip()
 
+        if description:
+            return description
+
+        return "TMDB has no description available for this movie."
+
+    except requests.exceptions.HTTPError as error:
+        return f"TMDB API error: {error.response.status_code}"
+
+    except requests.exceptions.RequestException:
+        return "Unable to connect to TMDB. Check your internet connection."
 
 st.header("🎬 Discover Movies")
 
