@@ -8,7 +8,9 @@ from sklearn.metrics.pairwise import cosine_similarity
 from model.collaborative_model import personalized_recommendations
 from api.database import SessionLocal, Rating
 import hashlib
-
+from fastapi import HTTPException
+from pydantic import BaseModel, Field
+from api.database import SessionLocal, Review
 
 app = FastAPI(
     title="Personalized Movie Recommendation API",
@@ -46,6 +48,12 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+class ReviewRequest(BaseModel):
+    user_id: int
+    movie_id: int
+    rating: float = Field(ge=1, le=5)
+    review_text: str = Field(min_length=3, max_length=1000)
 
 @app.get("/")
 def home():
@@ -377,3 +385,84 @@ def login_user(data: LoginRequest):
         "username": user.username,
         "email": user.email
     }
+
+
+@app.post("/reviews")
+def save_review(review_data: ReviewRequest):
+    db = SessionLocal()
+
+    try:
+        review = (
+            db.query(Review)
+            .filter(
+                Review.user_id == review_data.user_id,
+                Review.movie_id == review_data.movie_id
+            )
+            .first()
+        )
+
+        if review:
+            # Update the user's existing review
+            review.rating = review_data.rating
+            review.review_text = review_data.review_text
+            message = "Review updated successfully"
+        else:
+            # Create a new review
+            review = Review(
+                user_id=review_data.user_id,
+                movie_id=review_data.movie_id,
+                rating=review_data.rating,
+                review_text=review_data.review_text
+            )
+            db.add(review)
+            message = "Review submitted successfully"
+
+        db.commit()
+
+        return {"message": message}
+
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Could not save the review"
+        )
+
+    finally:
+        db.close()
+
+
+@app.get("/reviews/{movie_id}")
+def get_movie_reviews(movie_id: int):
+    db = SessionLocal()
+
+    try:
+        reviews = (
+            db.query(Review)
+            .filter(Review.movie_id == movie_id)
+            .order_by(Review.created_at.desc())
+            .all()
+        )
+
+        average_rating = (
+            sum(review.rating for review in reviews) / len(reviews)
+            if reviews else 0
+        )
+
+        return {
+            "movie_id": movie_id,
+            "average_rating": round(average_rating, 2),
+            "total_reviews": len(reviews),
+            "reviews": [
+                {
+                    "user_id": review.user_id,
+                    "rating": review.rating,
+                    "review_text": review.review_text,
+                    "created_at": review.created_at
+                }
+                for review in reviews
+            ]
+        }
+
+    finally:
+        db.close()

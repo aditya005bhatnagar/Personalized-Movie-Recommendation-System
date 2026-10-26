@@ -977,231 +977,199 @@ else:
 
 
 
+# ---------------- MOVIE SEARCH & REVIEW PAGE ----------------
 
-# ---------------- RATE A MOVIE ----------------
+import os
 
-
-
-st.subheader("⭐ Rate a Movie")
-
+API_URL = "http://127.0.0.1:8000"
 
 
-search_movie = st.text_input(
+@st.cache_data(ttl=3600)
+def get_movie_description(title):
+    """Fetch a movie description from TMDB."""
+    token = os.getenv("TMDB_TOKEN")
 
-    "🔎 Search for a movie",
+    if not token:
+        return "Movie description is unavailable. Check your TMDB_TOKEN."
 
-    placeholder="Enter movie name..."
+    try:
+        response = requests.get(
+            "https://api.themoviedb.org/3/search/movie",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"query": title, "include_adult": False},
+            timeout=10
+        )
+        response.raise_for_status()
+        results = response.json().get("results", [])
 
+        if results:
+            return results[0].get(
+                "overview", "No description is available for this movie."
+            ) or "No description is available for this movie."
+
+        return "No description found."
+
+    except requests.RequestException:
+        return "Unable to load the description right now."
+
+
+st.header("🎬 Discover Movies")
+
+# Searchable movie selector
+movie_options = (
+    movies[["movieId", "title"]]
+    .drop_duplicates()
+    .sort_values("title")
+    .reset_index(drop=True)
 )
 
-
-
-if search_movie.strip():
-
-    filtered_movies = movies[
-
-        movies["title"].astype(str).str.contains(
-
-            search_movie.strip(),
-
-            case=False,
-
-            na=False,
-
-            regex=False
-
-        )
-
-    ].head(20)
-
-
-
-else:
-
-    filtered_movies = movies.head(20)
-
-
-
-
-
-movie_options = filtered_movies[
-
-    ["movieId", "title"]
-
-].values.tolist()
-
-
-
-
-
-if len(movie_options) > 0:
-
-
-
-    selected_movie = st.selectbox(
-
-        "Choose a movie:",
-
-        movie_options,
-
-        format_func=lambda item: item[1]
-
-    )
-
-
-
-    selected_movie_id = int(selected_movie[0])
-
-
-
-    existing_rating = rated_movies.get(
-
-        selected_movie_id,
-
-        None
-
-    )
-
-
-
-    if existing_rating is not None:
-
-        st.info(
-
-            f"You have already rated this movie: "
-
-            f"⭐ {existing_rating}/5"
-
-        )
-
-
-
-        default_rating = float(existing_rating)
-
-        button_text = "🔄 Update Rating"
-
-
-
-    else:
-
-        default_rating = 5.0
-
-        button_text = "⭐ Submit Rating"
-
-
-
-    rating = st.slider(
-
-        "Your Rating",
-
-        min_value=1.0,
-
-        max_value=5.0,
-
-        step=0.5,
-
-        value=default_rating
-
-    )
-
-
-
-    if st.button(button_text, width="stretch"):
-
-
+selected_title = st.selectbox(
+    "🔍 Search for a movie",
+    options=movie_options["title"].tolist(),
+    index=None,
+    placeholder="Type a movie title...",
+    key="review_movie_search"
+)
+
+if selected_title:
+    selected_row = movie_options[
+        movie_options["title"] == selected_title
+    ].iloc[0]
+
+    movie_id = int(selected_row["movieId"])
+
+    # Movie details
+    poster_col, details_col = st.columns([1, 2])
+
+    with poster_col:
+        poster_url = get_movie_poster(selected_title)
+
+        if poster_url:
+            st.image(poster_url, use_container_width=True)
+        else:
+            st.info("Poster unavailable")
+
+    with details_col:
+        st.subheader(selected_title)
+        st.write(get_movie_description(selected_title))
+
+        st.divider()
+        st.subheader("⭐ Community Rating")
 
         try:
+            result = requests.get(
+                f"{API_URL}/reviews/{movie_id}",
+                timeout=10
+            )
+            result.raise_for_status()
+            review_data = result.json()
 
-            response = requests.post(
+            rating_col, count_col = st.columns(2)
 
-                f"{API_URL}/ratings",
-
-                json={
-
-                    "user_id": selected_user,
-
-                    "movie_id": selected_movie_id,
-
-                    "rating": rating
-
-                },
-
-                timeout=15
-
+            rating_col.metric(
+                "Average Rating",
+                f'{review_data["average_rating"]:.1f} / 5'
+            )
+            count_col.metric(
+                "Total Reviews",
+                review_data["total_reviews"]
             )
 
+        except requests.RequestException:
+            review_data = None
+            st.warning("Could not load community ratings. Is the backend running?")
 
+    # Rating and written review in one form
+    st.divider()
+    st.subheader("✍️ Rate and Review This Movie")
 
-            try:
+    user_id = st.number_input(
+        "User ID",
+        min_value=1,
+        value=1,
+        step=1,
+        key="review_user_id"
+    )
 
-                data = response.json()
+    with st.form("movie_review_form", clear_on_submit=True):
+        rating = st.slider(
+            "Your rating",
+            min_value=1.0,
+            max_value=5.0,
+            value=4.0,
+            step=0.5
+        )
 
-            except ValueError:
+        review_text = st.text_area(
+            "Your written review",
+            placeholder="What did you think of this movie?",
+            max_chars=1000
+        )
 
-                data = {}
+        submitted = st.form_submit_button(
+            "Submit Rating & Review",
+            use_container_width=True
+        )
 
-
-
-            if response.status_code == 200:
-
-                if "error" in data:
-
-                    st.error(data["error"])
-
-                else:
-
-                    st.success(
-
-                        data.get(
-
-                            "message",
-
-                            "Rating saved successfully."
-
-                        )
-
-                    )
-
-                    st.rerun()
-
-
-
+        if submitted:
+            if len(review_text.strip()) < 3:
+                st.warning("Please write at least 3 characters.")
             else:
-
-                st.error(
-
-                    data.get(
-
-                        "detail",
-
-                        data.get("error", "Failed to submit rating.")
-
+                try:
+                    response = requests.post(
+                        f"{API_URL}/reviews",
+                        json={
+                            "user_id": int(user_id),
+                            "movie_id": movie_id,
+                            "rating": rating,
+                            "review_text": review_text.strip()
+                        },
+                        timeout=10
                     )
 
-                )
+                    if response.ok:
+                        st.success(response.json()["message"])
+                        st.rerun()
+                    else:
+                        st.error(f"Could not submit review: {response.text}")
 
+                except requests.RequestException:
+                    st.error(
+                        "Could not connect to the backend. "
+                        "Please start FastAPI."
+                    )
 
+    # Existing reviews
+    st.divider()
+    st.subheader("💬 What People Are Saying")
 
-        except requests.exceptions.RequestException:
+    try:
+        response = requests.get(
+            f"{API_URL}/reviews/{movie_id}",
+            timeout=10
+        )
+        response.raise_for_status()
+        review_data = response.json()
 
-            st.error(
+        if review_data["reviews"]:
+            for item in review_data["reviews"]:
+                with st.container(border=True):
+                    st.write(
+                        f'**User {item["user_id"]}** · '
+                        f'⭐ {item["rating"]}/5'
+                    )
+                    st.write(item["review_text"])
 
-                "Could not connect to FastAPI. "
+                    if item.get("created_at"):
+                        st.caption(str(item["created_at"]))
+        else:
+            st.info("No reviews yet. Be the first to review this movie!")
 
-                "Make sure the backend is running."
-
-            )
-
-
+    except requests.RequestException:
+        st.warning("Unable to load reviews right now.")
 
 else:
-
-    st.warning("No movies found.")
-
-
-
-st.divider()
-
+    st.info("Search for a movie above to see its details, ratings and reviews.")
 
 
 

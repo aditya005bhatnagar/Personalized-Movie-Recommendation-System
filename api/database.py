@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, Column, Integer, Float,String
 from sqlalchemy.orm import declarative_base, sessionmaker
-
+from sqlalchemy import Text, DateTime, UniqueConstraint
+from sqlalchemy.sql import func
 
 DATABASE_URL = "sqlite:///./movie_recommendation.db"
 
@@ -37,5 +38,18 @@ class Rating(Base):
 
     rating = Column(Float)
 
+class Review(Base):
+    __tablename__ = "reviews"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False)
+    movie_id = Column(Integer, nullable=False)
+    rating = Column(Float, nullable=False)
+    review_text = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "movie_id", name="unique_user_movie_review"),
+    )
 
 Base.metadata.create_all(bind=engine)
