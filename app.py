@@ -2,8 +2,6 @@ import os
 import re
 from difflib import SequenceMatcher
 
-
-
 import joblib
 
 import pandas as pd
@@ -14,17 +12,11 @@ import streamlit as st
 
 from dotenv import load_dotenv
 
-
-
 from api.database import SessionLocal, Rating
 
 load_dotenv()
 
-
-
 # ---------------- CONFIGURATION ----------------
-
-
 
 st.set_page_config(
 
@@ -36,15 +28,9 @@ st.set_page_config(
 
 )
 
-
-
 load_dotenv()
 
-
-
 TMDB_TOKEN = os.getenv("TMDB_TOKEN")
-
-
 
 TMDB_HEADERS = {
 
@@ -54,17 +40,9 @@ TMDB_HEADERS = {
 
 }
 
-
-
 API_URL = "http://127.0.0.1:8000"
 
-
-
-
-
 # ---------------- MOVIE POSTERS ----------------
-
-
 
 @st.cache_data(ttl=86400)
 
@@ -74,8 +52,6 @@ def get_movie_poster(title):
 
         return ""
 
-
-
     # Extract the release year from MovieLens titles
 
     title = str(title).strip()
@@ -84,11 +60,7 @@ def get_movie_poster(title):
 
     year = year_match.group(1) if year_match else None
 
-
-
     clean_title = re.sub(r"\s*\(\d{4}\)\s*$", "", title).strip()
-
-
 
     try:
 
@@ -104,13 +76,9 @@ def get_movie_poster(title):
 
         }
 
-
-
         if year:
 
             params["year"] = year
-
-
 
         response = requests.get(
 
@@ -124,13 +92,9 @@ def get_movie_poster(title):
 
         )
 
-
-
         response.raise_for_status()
 
         results = response.json().get("results", [])
-
-
 
         # If year-specific search finds nothing, try without the year
 
@@ -156,21 +120,15 @@ def get_movie_poster(title):
 
             )
 
-
-
             response.raise_for_status()
 
             results = response.json().get("results", [])
-
-
 
         if not results:
 
             print(f"No TMDB result for: {title}")
 
             return ""
-
-
 
         # Choose the closest title and release year match
 
@@ -180,8 +138,6 @@ def get_movie_poster(title):
 
         best_score = -1
 
-
-
         for result in results:
 
             poster_path = result.get("poster_path")
@@ -189,8 +145,6 @@ def get_movie_poster(title):
             if not poster_path:
 
                 continue
-
-
 
             candidate = (
 
@@ -202,15 +156,11 @@ def get_movie_poster(title):
 
             ).casefold()
 
-
-
             similarity = SequenceMatcher(
 
                 None, target, candidate
 
             ).ratio()
-
-
 
             release_date = result.get("release_date", "")
 
@@ -220,11 +170,7 @@ def get_movie_poster(title):
 
             )
 
-
-
             score = similarity
-
-
 
             if year and candidate_year:
 
@@ -236,27 +182,19 @@ def get_movie_poster(title):
 
                     score -= 0.5
 
-
-
             if score > best_score:
 
                 best_score = score
 
                 best_result = poster_path
 
-
-
         if best_result:
 
             return "https://image.tmdb.org/t/p/w500" + best_result
 
-
-
         print(f"No poster available for: {title}")
 
         return ""
-
-
 
     except requests.exceptions.RequestException as error:
 
@@ -264,47 +202,27 @@ def get_movie_poster(title):
 
         return ""
 
-
-
-
-
 # ---------------- SESSION STATE ----------------
-
-
 
 if "logged_in" not in st.session_state:
 
     st.session_state.logged_in = False
 
-
-
 if "user_id" not in st.session_state:
 
     st.session_state.user_id = None
-
-
 
 if "username" not in st.session_state:
 
     st.session_state.username = None
 
-
-
-
-
 # ---------------- LOAD DATA AND MODELS ----------------
-
-
 
 @st.cache_data
 
 def load_movies():
 
     return pd.read_pickle("saved_models/movies.pkl")
-
-
-
-
 
 @st.cache_resource
 
@@ -316,15 +234,11 @@ def load_models():
 
     )
 
-
-
     user_movie_matrix = joblib.load(
 
         "saved_models/user_movie_matrix.pkl"
 
     )
-
-
 
     user_ids = joblib.load(
 
@@ -332,21 +246,11 @@ def load_models():
 
     )
 
-
-
     return user_model, user_movie_matrix, user_ids
-
-
-
-
 
 # ---------------- LOGIN AND REGISTRATION ----------------
 
-
-
 if not st.session_state.logged_in:
-
-
 
     st.markdown(
 
@@ -355,8 +259,6 @@ if not st.session_state.logged_in:
         unsafe_allow_html=True
 
     )
-
-
 
     st.markdown(
 
@@ -370,17 +272,11 @@ if not st.session_state.logged_in:
 
     )
 
-
-
     tab1, tab2 = st.tabs(["Login", "Register"])
-
-
 
     with tab1:
 
         st.subheader("Login")
-
-
 
         email = st.text_input(
 
@@ -389,8 +285,6 @@ if not st.session_state.logged_in:
             key="login_email"
 
         )
-
-
 
         password = st.text_input(
 
@@ -402,17 +296,11 @@ if not st.session_state.logged_in:
 
         )
 
-
-
         if st.button("Login", width="stretch"):
-
-
 
             if not email.strip() or not password:
 
                 st.warning("Please enter your email and password.")
-
-
 
             else:
 
@@ -434,8 +322,6 @@ if not st.session_state.logged_in:
 
                     )
 
-
-
                     try:
 
                         data = response.json()
@@ -443,8 +329,6 @@ if not st.session_state.logged_in:
                     except ValueError:
 
                         data = {}
-
-
 
                     if response.status_code == 200:
 
@@ -466,8 +350,6 @@ if not st.session_state.logged_in:
 
                             )
 
-
-
                     else:
 
                         st.error(
@@ -488,8 +370,6 @@ if not st.session_state.logged_in:
 
                         )
 
-
-
                 except requests.exceptions.RequestException:
 
                     st.error(
@@ -500,13 +380,9 @@ if not st.session_state.logged_in:
 
                     )
 
-
-
     with tab2:
 
         st.subheader("Create Account")
-
-
 
         username = st.text_input(
 
@@ -516,8 +392,6 @@ if not st.session_state.logged_in:
 
         )
 
-
-
         email = st.text_input(
 
             "Email",
@@ -525,8 +399,6 @@ if not st.session_state.logged_in:
             key="register_email"
 
         )
-
-
 
         password = st.text_input(
 
@@ -538,17 +410,11 @@ if not st.session_state.logged_in:
 
         )
 
-
-
         if st.button("Register", width="stretch"):
-
-
 
             if not username.strip() or not email.strip() or not password:
 
                 st.warning("Please complete all fields.")
-
-
 
             else:
 
@@ -572,8 +438,6 @@ if not st.session_state.logged_in:
 
                     )
 
-
-
                     try:
 
                         data = response.json()
@@ -581,8 +445,6 @@ if not st.session_state.logged_in:
                     except ValueError:
 
                         data = {}
-
-
 
                     if response.status_code == 200:
 
@@ -628,8 +490,6 @@ if not st.session_state.logged_in:
 
                         )
 
-
-
                 except requests.exceptions.RequestException:
 
                     st.error(
@@ -640,17 +500,9 @@ if not st.session_state.logged_in:
 
                     )
 
-
-
     st.stop()
 
-
-
-
-
 # ---------------- LOAD APP DATA ----------------
-
-
 
 try:
 
@@ -658,27 +510,15 @@ try:
 
     user_model, user_movie_matrix, user_ids = load_models()
 
-
-
 except Exception as error:
 
     st.error(f"Could not load movie data or models: {error}")
 
     st.stop()
 
-
-
-
-
 selected_user = st.session_state.user_id
 
-
-
-
-
 # ---------------- HEADER ----------------
-
-
 
 st.markdown(
 
@@ -687,8 +527,6 @@ st.markdown(
     unsafe_allow_html=True
 
 )
-
-
 
 st.markdown(
 
@@ -702,8 +540,6 @@ st.markdown(
 
 )
 
-
-
 st.markdown(
 
     "<p style='text-align;font-size:18px;'>"
@@ -716,51 +552,29 @@ st.markdown(
 
 )
 
-
-
 st.divider()
-
-
-
-
 
 # ---------------- SIDEBAR ----------------
 
-
-
 with st.sidebar:
 
-
-
     st.header("🎯 Recommendation Settings")
-
-
 
     st.write(f"👤 User: {st.session_state.username}")
 
     st.write(f"User ID: {selected_user}")
 
-
-
     st.divider()
-
-
 
     st.markdown("### 🤖 Recommendation Method")
 
     st.info("User-Based Collaborative Filtering")
 
-
-
     st.markdown("### 🔍 Similarity")
 
     st.info("Cosine Distance")
 
-
-
     st.divider()
-
-
 
     st.caption(
 
@@ -769,8 +583,6 @@ with st.sidebar:
         "patterns of similar users."
 
     )
-
-
 
     if st.button("Logout", width="stretch"):
 
@@ -782,17 +594,9 @@ with st.sidebar:
 
         st.rerun()
 
-
-
-
-
 # ---------------- USER RATINGS ----------------
 
-
-
 db = SessionLocal()
-
-
 
 try:
 
@@ -810,10 +614,6 @@ finally:
 
     db.close()
 
-
-
-
-
 rated_movies = pd.Series(
 
     {
@@ -828,13 +628,7 @@ rated_movies = pd.Series(
 
 )
 
-
-
-
-
 # ---------------- USER PROFILE ----------------
-
-
 
 st.markdown(
 
@@ -844,23 +638,15 @@ st.markdown(
 
 )
 
-
-
 col1, col2, col3 = st.columns(3)
-
-
 
 with col1:
 
     st.metric("User ID", selected_user)
 
-
-
 with col2:
 
     st.metric("Movies Rated", len(rated_movies))
-
-
 
 with col3:
 
@@ -874,8 +660,6 @@ with col3:
 
     )
 
-
-
     st.metric(
 
         "Average Rating",
@@ -884,23 +668,11 @@ with col3:
 
     )
 
-
-
 st.divider()
 
-
-
-
-
 # ---------------- HIGHLY RATED MOVIES ----------------
 
-
-
-
-
 # ---------------- HIGHLY RATED MOVIES ----------------
-
-
 
 st.markdown(
 
@@ -910,27 +682,19 @@ st.markdown(
 
 )
 
-
-
 top_rated = rated_movies.sort_values(
 
     ascending=False
 
 ).head(5)
 
-
-
 if top_rated.empty:
 
     st.info("This user has not rated any movies.")
 
-
-
 else:
 
     cols = st.columns(5)
-
-
 
     for i, (movie_id, rating) in enumerate(top_rated.items()):
 
@@ -940,19 +704,13 @@ else:
 
         ]
 
-
-
         if not movie.empty:
 
             title = movie.iloc[0]["title"]
 
-
-
             with cols[i]:
 
                 poster_url = get_movie_poster(title)
-
-
 
                 if poster_url:
 
@@ -968,22 +726,15 @@ else:
 
                     st.write("🎬 Poster unavailable")
 
-
-
                 st.markdown(f"**{title}**")
 
                 st.write(f"⭐ Rating: {rating}/5")
-
-
-
 
 # ---------------- MOVIE SEARCH & REVIEW PAGE ----------------
 
 import os
 
 API_URL = "http://127.0.0.1:8000"
-
-
 
 @st.cache_data(ttl=3600)
 def get_movie_description(title):
@@ -1205,16 +956,9 @@ if selected_title:
 else:
     st.info("Search for a movie above to see its details, ratings and reviews.")
 
-
-
-
 # ---------------- PERSONALIZED RECOMMENDATIONS ----------------
 
-
-
 st.subheader("🍿 Personalized Recommendations")
-
-
 
 if st.button(
 
@@ -1224,15 +968,11 @@ if st.button(
 
 ):
 
-
-
     with st.spinner(
 
         "Finding users with similar movie preferences..."
 
     ):
-
-
 
         try:
 
@@ -1244,8 +984,6 @@ if st.button(
 
             )
 
-
-
             try:
 
                 data = response.json()
@@ -1254,11 +992,7 @@ if st.button(
 
                 data = {}
 
-
-
             if response.status_code == 200:
-
-
 
                 recommendations = data.get(
 
@@ -1267,8 +1001,6 @@ if st.button(
                     []
 
                 )
-
-
 
                 if not recommendations:
 
@@ -1280,8 +1012,6 @@ if st.button(
 
                     )
 
-
-
                 else:
 
                     st.success(
@@ -1292,23 +1022,15 @@ if st.button(
 
                     )
 
-
-
                     st.subheader(
 
                         f"🍿 Recommended Movies for User {selected_user}"
 
                     )
 
-
-
                     for i, movie in enumerate(recommendations, 1):
 
-
-
                         col1, col2 = st.columns([1, 3])
-
-
 
                         with col1:
 
@@ -1317,8 +1039,6 @@ if st.button(
                                 movie["title"]
 
                             )
-
-
 
                             if poster_url:
 
@@ -1334,8 +1054,6 @@ if st.button(
 
                                 st.write("🎬 Poster unavailable")
 
-
-
                         with col2:
 
                             st.markdown(
@@ -1343,8 +1061,6 @@ if st.button(
                                 f"### #{i} 🎬 {movie['title']}"
 
                             )
-
-
 
                             st.write(
 
@@ -1354,11 +1070,7 @@ if st.button(
 
                             )
 
-
-
                             score = movie.get("score")
-
-
 
                             if score is not None:
 
@@ -1370,11 +1082,7 @@ if st.button(
 
                                 )
 
-
-
                         st.divider()
-
-
 
             else:
 
@@ -1396,8 +1104,6 @@ if st.button(
 
                 )
 
-
-
         except requests.exceptions.RequestException:
 
             st.error(
@@ -1408,30 +1114,20 @@ if st.button(
 
             )
 
-
-
-
-
 # ---------------- FOOTER ----------------
-
-
 
 st.divider()
 
-
-
 st.caption(
-    
+
     "Built with Python • Pandas • Scikit-learn • Streamlit • "
 
     "User-Based Collaborative Filtering"
 
 )
 
-
-
 st.caption(
-    
+
     "This product uses the TMDB API but is not endorsed "
     "or certified by TMDB."
 
